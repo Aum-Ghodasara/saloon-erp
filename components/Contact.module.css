@@ -1,0 +1,174 @@
+.section {
+  position: relative;
+  width: 100%;
+  padding: 120px 0 80px 0;
+  background-image: linear-gradient(
+      rgba(8, 8, 8, 0.72) 0%, 
+      rgba(8, 8, 8, 0.82) 100%
+    ),
+    url('/barbershop_floor.png');
+  background-size: cover;
+  background-position: center;
+  background-attachment: scroll; /* parallax or scroll */
+  border-top: 1px solid rgba(249, 246, 240, 0.05);
+  color: var(--color-cream);
+  overflow: hidden;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 40px;
+  position: relative;
+  z-index: 2;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1.2fr 1.6fr;
+  gap: 60px;
+  margin-bottom: 60px;
+}
+
+@media (max-width: 960px) {
+  .grid {
+    grid-template-columns: 1.2fr 1.2fr;
+    gap: 40px;
+  }
+}
+
+@media (max-width: 640px) {
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 48px;
+  }
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 32px;
+}
+
+.topSection {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.bottomSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.text {
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.8;
+  letter-spacing: 0.08em;
+  color: var(--color-cream);
+  text-transform: uppercase;
+}
+
+.link {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  color: var(--color-cream-dim);
+  text-transform: uppercase;
+  transition: color 0.3s ease, transform 0.3s ease;
+  display: inline-block;
+  width: fit-content;
+}
+
+.link:hover {
+  color: var(--color-terracotta-light);
+  transform: translateX(4px);
+}
+
+.emailLink {
+  text-transform: lowercase;
+}
+
+
+/* Call To Action Box Button */
+.ctaBox {
+  display: flex;
+  width: 100%;
+  border: 1px solid var(--color-cream);
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  background-color: rgba(8, 8, 8, 0.4);
+  align-self: flex-start;
+}
+
+@media (max-width: 960px) {
+  .ctaBox {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 640px) {
+  .ctaBox {
+    grid-column: span 1;
+  }
+}
+
+.ctaBox:hover {
+  transform: translateY(-4px);
+  border-color: var(--color-terracotta-light);
+  box-shadow: 0 12px 30px rgba(154, 66, 45, 0.25);
+}
+
+.ctaTextPart {
+  flex: 1.3;
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  border-right: 1px solid var(--color-cream);
+  transition: all 0.4s ease;
+}
+
+.ctaBox:hover .ctaTextPart {
+  border-color: var(--color-terracotta-light);
+}
+
+.ctaText {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: 0.12em;
+  color: var(--color-cream);
+  text-transform: uppercase;
+}
+
+.ctaBtnPart {
+  flex: 1;
+  background-color: var(--color-cream);
+  color: var(--color-obsidian);
+  padding: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ctaBtnText {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.4;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.ctaBox:hover .ctaBtnPart {
+  background-color: var(--color-terracotta);
+  color: var(--color-cream);
+}

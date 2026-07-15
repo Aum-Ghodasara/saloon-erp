@@ -1,0 +1,86 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&family=Outfit:wght@100..900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-terracotta: #9a422d;
+  --color-terracotta-dark: #6e2e1f;
+  --color-terracotta-light: #b4523b;
+  --color-cream: #f9f6f0;
+  --color-cream-dim: #ddd9d4;
+  --color-obsidian: #080808;
+  --color-charcoal: #141414;
+  --color-gray: #8f8680;
+
+  --font-display: 'Outfit', sans-serif;
+  --font-body: 'Montserrat', sans-serif;
+}
+
+/* Custom premium scrollbars & overlays */
+@layer base {
+
+  html,
+  body {
+    background-color: var(--color-obsidian);
+    color: var(--color-cream);
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.6;
+    width: 100%;
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--color-obsidian);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-terracotta);
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-terracotta-light);
+  }
+}
+
+/* Background Grain Texture Overlay */
+.noise-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  content: "";
+  opacity: 0.035;
+  pointer-events: none;
+  z-index: 9999;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes heroScrollAnim {
+  0% {
+    transform: translateY(-100%);
+  }
+
+  80%,
+  100% {
+    transform: translateY(333%);
+  }
+}
