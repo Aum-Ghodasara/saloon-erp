@@ -9,6 +9,10 @@ import {
   Tag, MessageSquare, MonitorPlay, Timer, Play, Star
 } from "lucide-react";
 import GeomText from "../../components/GeomText";
+import { 
+  getBookings, saveBooking, updateBookingStatus, deleteBooking,
+  getReviews, updateReviewReply, getCoupons, saveCoupon, deleteCoupon, signOutUser
+} from "../../lib/db";
 
 const SERVICES_DEFAULT = [
   { id: 1, name: "Precision Haircut", price: 65, dur: "45 mins" },
@@ -61,22 +65,20 @@ export default function AdminDashboard() {
       setIsAdmin(true);
     }
 
-    // Load bookings
-    const savedBookings = localStorage.getItem("bsmart_bookings");
-    if (savedBookings) {
-      setBookings(JSON.parse(savedBookings));
-    }
+    // Load dashboard data from Supabase / LocalStorage
+    const loadDashboardData = async () => {
+      const [bookingsList, reviewsList, couponsList] = await Promise.all([
+        getBookings(),
+        getReviews(),
+        getCoupons()
+      ]);
+      setBookings(bookingsList);
+      setReviews(reviewsList);
+      setActiveCoupons(couponsList);
+    };
 
-    // Load reviews
-    const savedReviews = localStorage.getItem("bsmart_reviews");
-    if (savedReviews) {
-      setReviews(JSON.parse(savedReviews));
-    }
-
-    // Load coupons
-    const savedCoupons = localStorage.getItem("bsmart_coupons");
-    if (savedCoupons) {
-      setActiveCoupons(JSON.parse(savedCoupons));
+    if (role === "admin") {
+      loadDashboardData();
     }
 
     // Initialize Now Serving Token from localStorage if exists
@@ -98,22 +100,21 @@ export default function AdminDashboard() {
     );
   }
 
-  // Update localStorage database for bookings
-  const updateBookingsDB = (updatedList) => {
+  // Update database for bookings (state and DB)
+  const updateBookingsDB = async (updatedList) => {
     setBookings(updatedList);
     localStorage.setItem("bsmart_bookings", JSON.stringify(updatedList));
   };
 
-  // Update localStorage database for reviews
-  const updateReviewsDB = (updatedList) => {
+  // Update database for reviews (state and event dispatch)
+  const updateReviewsDB = async (updatedList) => {
     setReviews(updatedList);
     localStorage.setItem("bsmart_reviews", JSON.stringify(updatedList));
-    // Trigger update event for landing page Clientele testimonials
     window.dispatchEvent(new Event("bsmart_reviews_updated"));
   };
 
   // Status updates
-  const handleStatusChange = (id, newStatus) => {
+  const handleStatusChange = async (id, newStatus) => {
     const targetBooking = bookings.find((b) => b.id === id);
     
     if ((newStatus === "Completed" || newStatus === "Serving") && targetBooking?.token) {
@@ -127,19 +128,43 @@ export default function AdminDashboard() {
       }
       return b;
     });
-    updateBookingsDB(list);
+    setBookings(list);
+
+    // Save to Supabase / LocalStorage
+    await updateBookingStatus(id, newStatus);
+
+    // Send confirmation email on status changes
+    if (targetBooking && targetBooking.email && targetBooking.email !== "walkin@bsmart.com") {
+      fetch("/api/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: targetBooking.email,
+          name: targetBooking.name,
+          bookingId: targetBooking.id,
+          service: targetBooking.service,
+          artisan: targetBooking.artisan,
+          date: targetBooking.date,
+          time: targetBooking.time,
+          price: targetBooking.price,
+          status: newStatus,
+          trackingOrigin: window.location.origin
+        })
+      }).catch((err) => console.error("Failed to send status update email:", err));
+    }
   };
 
   // Delete booking
-  const handleDeleteBooking = (id) => {
+  const handleDeleteBooking = async (id) => {
     if (window.confirm("Are you sure you want to delete this booking record?")) {
       const list = bookings.filter((b) => b.id !== id);
-      updateBookingsDB(list);
+      setBookings(list);
+      await deleteBooking(id);
     }
   };
 
   // Add Walk-in booking
-  const handleAddWalkin = (e) => {
+  const handleAddWalkin = async (e) => {
     e.preventDefault();
     if (!walkinName || !walkinPhone) return;
 
@@ -163,7 +188,8 @@ export default function AdminDashboard() {
     };
 
     const list = [...bookings, newBooking];
-    updateBookingsDB(list);
+    setBookings(list);
+    await saveBooking(newBooking);
     
     // Reset Form
     setWalkinName("");
@@ -172,7 +198,7 @@ export default function AdminDashboard() {
   };
 
   // Create Custom Coupon code
-  const handleAddCoupon = (e) => {
+  const handleAddCoupon = async (e) => {
     e.preventDefault();
     if (!couponCodeInput || !couponValueInput) return;
     const code = couponCodeInput.trim().toUpperCase();
@@ -184,7 +210,6 @@ export default function AdminDashboard() {
     }
 
     const newCoupon = {
-      id: `cp-${Date.now()}`,
       code,
       type: couponTypeInput,
       value: parseInt(couponValueInput, 10) || 0
@@ -192,23 +217,23 @@ export default function AdminDashboard() {
 
     const list = [...activeCoupons, newCoupon];
     setActiveCoupons(list);
-    localStorage.setItem("bsmart_coupons", JSON.stringify(list));
+    await saveCoupon(newCoupon);
 
     setCouponCodeInput("");
     setCouponValueInput("");
   };
 
   // Revoke Custom Coupon code
-  const handleDeleteCoupon = (id) => {
+  const handleDeleteCoupon = async (code) => {
     if (window.confirm("Are you sure you want to revoke this coupon code?")) {
-      const list = activeCoupons.filter((c) => c.id !== id);
+      const list = activeCoupons.filter((c) => c.code !== code);
       setActiveCoupons(list);
-      localStorage.setItem("bsmart_coupons", JSON.stringify(list));
+      await deleteCoupon(code);
     }
   };
 
   // Post Admin Review reply
-  const handlePostReply = (reviewId) => {
+  const handlePostReply = async (reviewId) => {
     const text = replyText[reviewId];
     if (!text || !text.trim()) return;
 
@@ -218,7 +243,9 @@ export default function AdminDashboard() {
       }
       return r;
     });
-    updateReviewsDB(list);
+    setReviews(list);
+    await updateReviewReply(reviewId, text);
+    
     setReplyText({ ...replyText, [reviewId]: "" }); // clear field
   };
 
@@ -233,9 +260,11 @@ export default function AdminDashboard() {
     setServices(list);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     localStorage.removeItem("bsmart_role");
     localStorage.removeItem("bsmart_user");
+    localStorage.removeItem("bsmart_user_id");
+    await signOutUser();
     router.push("/");
   };
 
@@ -1053,7 +1082,7 @@ export default function AdminDashboard() {
                       </thead>
                       <tbody className="divide-y divide-cream/5">
                         {activeCoupons.map((c) => (
-                          <tr key={c.id} className="hover:bg-cream/1 transition-colors">
+                          <tr key={c.code} className="hover:bg-cream/1 transition-colors">
                             <td className="p-4 pl-6 font-bold text-cream uppercase">{c.code}</td>
                             <td className="p-4 text-cream-dim uppercase">{c.type}</td>
                             <td className="p-4 font-semibold text-terracotta-light">
@@ -1064,7 +1093,7 @@ export default function AdminDashboard() {
                             </td>
                             <td className="p-4 text-right pr-6">
                               <button 
-                                onClick={() => handleDeleteCoupon(c.id)}
+                                onClick={() => handleDeleteCoupon(c.code)}
                                 className="p-1.5 bg-cream/5 text-gray hover:bg-red-600 hover:text-white transition-colors cursor-pointer"
                                 title="Revoke Coupon"
                               >

@@ -1,4 +1,5 @@
 import "./globals.css";
+import ClientLayout from "../components/ClientLayout";
 
 export const metadata = {
   title: "B Smart Salon The Unisex Salon",
@@ -17,7 +18,7 @@ export default function RootLayout({ children }) {
     <html lang="en">
       <body>
         <div className="noise-overlay" />
-        {children}
+        <ClientLayout>{children}</ClientLayout>
       </body>
     </html>
   );

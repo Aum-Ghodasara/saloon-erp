@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { X, Calendar, Check, ArrowRight, Tag } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { checkBirthdayByEmail, saveBooking, getBookings, getCurrentUserProfile } from "../lib/db";
 
 const SERVICES = [
   { id: 1, name: "Precision Haircut", price: "$65", dur: "45 mins" },
@@ -81,6 +82,59 @@ export default function BookingModal({ isOpen, onClose }) {
 
   // Dynamic time slots state
   const [generatedSlots, setGeneratedSlots] = useState([]);
+  const [allBookings, setAllBookings] = useState([]);
+  const [hasBirthday, setHasBirthday] = useState(false);
+
+  // Load active bookings on open
+  useEffect(() => {
+    if (isOpen) {
+      getBookings().then((list) => {
+        setAllBookings(list);
+      });
+      
+      // Pre-populate logged-in user profile details
+      const role = localStorage.getItem("bsmart_role");
+      const name = localStorage.getItem("bsmart_user");
+      if (role === "customer" && name) {
+        getCurrentUserProfile().then((profile) => {
+          if (profile) {
+            setFormData({
+              name: profile.name || name,
+              email: profile.email || "",
+              phone: profile.phone || "",
+              birthday: profile.birthday || ""
+            });
+            if (profile.birthday) {
+              setHasBirthday(true);
+            }
+          } else {
+            setFormData((prev) => ({
+              ...prev,
+              name: name,
+              email: name.toLowerCase().includes("aum") ? "aum@bsmart.com" : ""
+            }));
+          }
+        });
+      }
+    }
+  }, [isOpen]);
+
+  // Dynamically check for birthday when email changes
+  useEffect(() => {
+    const email = formData.email.trim();
+    if (email && email.includes("@") && email.includes(".")) {
+      checkBirthdayByEmail(email).then((birthday) => {
+        if (birthday && birthday !== "Not Provided") {
+          setFormData((prev) => ({ ...prev, birthday }));
+          setHasBirthday(true);
+        } else {
+          setHasBirthday(false);
+        }
+      });
+    } else {
+      setHasBirthday(false);
+    }
+  }, [formData.email]);
 
   // Dynamic slots recalculation hook
   useEffect(() => {
@@ -100,18 +154,8 @@ export default function BookingModal({ isOpen, onClose }) {
     // Selected service duration
     const serviceDuration = parseInt(selectedService.dur.replace(" mins", ""), 10);
 
-    // 3. Load active bookings for the selected date & stylist to check overlaps
-    let localBookings = [];
-    try {
-      const saved = localStorage.getItem("bsmart_bookings");
-      if (saved) {
-        localBookings = JSON.parse(saved);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-
-    const stylistBookings = localBookings.filter(
+    // 3. Filter active bookings for overlaps from state
+    const stylistBookings = allBookings.filter(
       (b) => b.date === selectedDate && b.artisan === selectedArtisan.name && b.status !== "Cancelled"
     );
 
@@ -154,7 +198,7 @@ export default function BookingModal({ isOpen, onClose }) {
 
     setGeneratedSlots(slots);
     setSelectedTime(null); // Clear selected slot when criteria shifts
-  }, [selectedService, selectedArtisan, selectedDate]);
+  }, [selectedService, selectedArtisan, selectedDate, allBookings]);
 
   if (!isOpen) return null;
 
@@ -206,7 +250,7 @@ export default function BookingModal({ isOpen, onClose }) {
   const handleNext = () => {
     if (step < 4) setStep(step + 1);
     else if (step === 4) {
-      // Save new booking to database (local storage)
+      // Save new booking to database (local storage & Supabase)
       const newBooking = {
         id: `b-${Date.now()}`,
         name: formData.name,
@@ -224,14 +268,42 @@ export default function BookingModal({ isOpen, onClose }) {
         status: "Confirmed"
       };
 
-      try {
-        const existing = localStorage.getItem("bsmart_bookings");
-        const list = existing ? JSON.parse(existing) : [];
-        list.push(newBooking);
-        localStorage.setItem("bsmart_bookings", JSON.stringify(list));
-      } catch (err) {
-        console.error("Failed to write booking:", err);
-      }
+      saveBooking(newBooking).then((res) => {
+        if (!res.success) {
+          console.error("Failed to save booking:", res.error);
+        }
+      });
+
+      // Trigger asynchronous Gmail notification send
+      fetch("/api/send-email", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email: newBooking.email,
+          name: newBooking.name,
+          bookingId: newBooking.id,
+          service: newBooking.service,
+          artisan: newBooking.artisan,
+          date: newBooking.date,
+          time: newBooking.time,
+          price: newBooking.price,
+          status: newBooking.status,
+          trackingOrigin: window.location.origin
+        })
+      })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          console.log("Booking confirmation email triggered successfully.", data);
+        } else {
+          console.error("Email notification API failed:", data.error);
+        }
+      })
+      .catch((err) => {
+        console.error("Network error trying to trigger email notification:", err);
+      });
 
       setStep(5);
     }
@@ -444,16 +516,29 @@ export default function BookingModal({ isOpen, onClose }) {
                   </div>
 
                   {/* Birthday Date Input */}
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[12px] font-semibold tracking-[0.1em] uppercase text-gray">Birthday</label>
-                    <input 
-                      type="date" 
-                      required
-                      className="bg-cream/3 border border-cream/8 p-3 px-4 text-cream font-body text-[14px] outline-none transition-colors duration-300 focus:border-terracotta [&::-webkit-calendar-picker-indicator]:invert"
-                      value={formData.birthday}
-                      onChange={(e) => setFormData({ ...formData, birthday: e.target.value })}
-                    />
-                  </div>
+                  {!hasBirthday ? (
+                    <div className="flex flex-col gap-2">
+                      <label className="text-[12px] font-semibold tracking-[0.1em] uppercase text-gray">Birthday</label>
+                      <input 
+                        type="date" 
+                        required
+                        className="bg-cream/3 border border-cream/8 p-3 px-4 text-cream font-body text-[14px] outline-none transition-colors duration-300 focus:border-terracotta [&::-webkit-calendar-picker-indicator]:invert"
+                        value={formData.birthday}
+                        onChange={(e) => setFormData({ ...formData, birthday: e.target.value })}
+                      />
+                    </div>
+                  ) : (
+                    <div className="bg-cream/2 border border-cream/5 p-4 flex items-center justify-between">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-[10px] font-bold text-gray uppercase tracking-wider">Birthday Status</span>
+                        <span className="text-xs text-emerald-400 font-semibold uppercase tracking-wider flex items-center gap-1.5">
+                          <Check size={13} />
+                          Verified
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-gray uppercase tracking-widest bg-cream/3 px-2.5 py-1 border border-cream/5 animate-pulse">Already on File</span>
+                    </div>
+                  )}
 
                   {/* Coupon Validation Block */}
                   <div className="border-t border-cream/8 pt-4 mt-2">

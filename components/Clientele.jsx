@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Quote, Star } from "lucide-react";
+import { getReviews } from "../lib/db";
 
 const TESTIMONIALS_DEFAULT = [
   {
@@ -98,17 +99,16 @@ const TESTIMONIALS_DEFAULT = [
 export default function Clientele() {
   const [reviews, setReviews] = useState([]);
 
-  const loadReviews = () => {
+  const loadReviews = async () => {
     try {
-      const saved = localStorage.getItem("bsmart_reviews");
-      if (saved) {
-        setReviews(JSON.parse(saved));
+      const list = await getReviews();
+      if (list && list.length > 0) {
+        setReviews(list);
       } else {
-        localStorage.setItem("bsmart_reviews", JSON.stringify(TESTIMONIALS_DEFAULT));
         setReviews(TESTIMONIALS_DEFAULT);
       }
     } catch (e) {
-      console.error(e);
+      console.error("Failed to load reviews:", e);
       setReviews(TESTIMONIALS_DEFAULT);
     }
   };

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { Star } from "lucide-react";
 import { motion } from "framer-motion";
+import { saveReview } from "../lib/db";
 
 const AVATARS = [
   { id: "av-1", url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80", gender: "F" },
@@ -42,7 +43,7 @@ export default function LeaveReview() {
     }
   }, []);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!userName.trim() || !comment.trim()) return;
 
@@ -60,19 +61,15 @@ export default function LeaveReview() {
       reply: ""
     };
 
-    try {
-      const existing = localStorage.getItem("bsmart_reviews");
-      const list = existing ? JSON.parse(existing) : [];
-      list.push(newReview);
-      localStorage.setItem("bsmart_reviews", JSON.stringify(list));
-      
+    const res = await saveReview(newReview);
+    if (res.success) {
       // Trigger update on Clientele component by dispatching custom event
       window.dispatchEvent(new Event("bsmart_reviews_updated"));
       
       setSuccess(true);
       setComment("");
-    } catch (err) {
-      console.error(err);
+    } else {
+      alert("Failed to submit review: " + (res.error || "Unknown error"));
     }
   };
 

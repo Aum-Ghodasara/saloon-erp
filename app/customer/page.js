@@ -7,6 +7,7 @@ import {
   MapPin, Phone, ShieldCheck, Gift, Check, Trash2, HelpCircle 
 } from "lucide-react";
 import GeomText from "../../components/GeomText";
+import { getBookings, updateBookingStatus } from "../../lib/db";
 
 export default function CustomerDashboard() {
   const router = useRouter();
@@ -29,15 +30,18 @@ export default function CustomerDashboard() {
       }
     }
 
-    // Load user bookings
-    const saved = localStorage.getItem("bsmart_bookings");
-    if (saved) {
-      const list = JSON.parse(saved);
-      // Filter bookings matching customer name (case insensitive)
+    // Load user bookings from Supabase / LocalStorage
+    const fetchCustomerBookings = async () => {
+      const list = await getBookings();
+      const searchKey = (name || "aum").toLowerCase().split(" ")[0];
       const userBookings = list.filter(
-        (b) => b.name.toLowerCase().includes("aum")
+        (b) => b.name.toLowerCase().includes(searchKey) || (b.email && b.email.toLowerCase() === "aum@bsmart.com")
       );
       setBookings(userBookings);
+    };
+
+    if (role === "customer") {
+      fetchCustomerBookings();
     }
   }, [router]);
 
@@ -53,34 +57,44 @@ export default function CustomerDashboard() {
   }
 
   // Cancel Booking handler
-  const handleCancelBooking = (bookingId) => {
+  const handleCancelBooking = async (bookingId) => {
     if (window.confirm("Are you sure you want to cancel this appointment session?")) {
-      // 1. Update localStorage database
-      let allBookings = [];
-      try {
-        const saved = localStorage.getItem("bsmart_bookings");
-        if (saved) allBookings = JSON.parse(saved);
-      } catch (e) {
-        console.error(e);
+      // 1. Update database
+      const res = await updateBookingStatus(bookingId, "Cancelled");
+      if (res.success) {
+        // 2. Update local state
+        const updatedUser = bookings.map((b) => {
+          if (b.id === bookingId) {
+            return { ...b, status: "Cancelled" };
+          }
+          return b;
+        });
+        setBookings(updatedUser);
+        setConciergeMsg("Appointment cancelled successfully. Let us know if you want to reschedule!");
+
+        // 3. Trigger cancellation email
+        const targetB = bookings.find(b => b.id === bookingId);
+        if (targetB) {
+          fetch("/api/send-email", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: targetB.email,
+              name: targetB.name,
+              bookingId: targetB.id,
+              service: targetB.service,
+              artisan: targetB.artisan,
+              date: targetB.date,
+              time: targetB.time,
+              price: targetB.price,
+              status: "Cancelled",
+              trackingOrigin: window.location.origin
+            })
+          }).catch((err) => console.error("Failed to send cancellation email:", err));
+        }
+      } else {
+        alert("Failed to cancel appointment. Please try again.");
       }
-
-      const updatedAll = allBookings.map((b) => {
-        if (b.id === bookingId) {
-          return { ...b, status: "Cancelled" };
-        }
-        return b;
-      });
-      localStorage.setItem("bsmart_bookings", JSON.stringify(updatedAll));
-
-      // 2. Update local state
-      const updatedUser = bookings.map((b) => {
-        if (b.id === bookingId) {
-          return { ...b, status: "Cancelled" };
-        }
-        return b;
-      });
-      setBookings(updatedUser);
-      setConciergeMsg("Appointment cancelled successfully. Let us know if you want to reschedule!");
     }
   };
 
